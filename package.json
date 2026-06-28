@@ -10,6 +10,10 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.1",
+    "@ai-sdk/google": "^4.0.2",
+    "@ai-sdk/mistral": "^4.0.1",
+    "@ai-sdk/openai": "^4.0.2",
+    "@ai-sdk/openai-compatible": "^3.0.1",
     "ai": "^7.0.4",
     "next": "16.2.9",
     "react": "19.2.4",
