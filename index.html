@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HackaTime Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>HackaTime Dashboard</h1>
+            <p class="subtitle" id="dateRange">Loading...</p>
+        </header>
+
+        <div class="stats-grid">
+            <div class="stat-card primary">
+                <div class="stat-label">Total Coding Time</div>
+                <div class="stat-value" id="totalTime">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Daily Average</div>
+                <div class="stat-value" id="dailyAvg">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Username</div>
+                <div class="stat-value" id="username">--</div>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h2>Languages</h2>
+                <canvas id="langChart"></canvas>
+                <div class="chart-legend" id="langLegend"></div>
+            </div>
+            <div class="chart-card">
+                <h2>Editors</h2>
+                <canvas id="editorChart"></canvas>
+                <div class="chart-legend" id="editorLegend"></div>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h2>Projects</h2>
+                <canvas id="projectChart"></canvas>
+                <div class="chart-legend" id="projectLegend"></div>
+            </div>
+            <div class="chart-card">
+                <h2>Operating Systems</h2>
+                <canvas id="osChart"></canvas>
+                <div class="chart-legend" id="osLegend"></div>
+            </div>
+        </div>
+
+        <div class="range-selector">
+            <button class="range-btn active" data-range="last_7_days">7 Days</button>
+            <button class="range-btn" data-range="last_30_days">30 Days</button>
+            <button class="range-btn" data-range="last_6_months">6 Months</button>
+            <button class="range-btn" data-range="last_year">1 Year</button>
+        </div>
+
+        <footer>
+            <p>Powered by <a href="https://hackatime.hackclub.com" target="_blank">HackaTime</a></p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
