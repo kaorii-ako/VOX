@@ -1,4 +1,6 @@
-# HackaTime Dashboard
+# VOX
+
+[![HackaTime](https://hackatime-badge.hackclub.com/kaorii-ako/VOX)](https://hackatime.hackclub.com)
 
 A web dashboard and CLI tool for viewing your [HackaTime](https://hackatime.hackclub.com) coding stats.
 
