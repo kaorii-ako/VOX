@@ -2,21 +2,28 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 
-type Role = "user" | "assistant";
-interface Message {
-  role: Role;
-  content: string;
+type State = "IDLE" | "RECORDING" | "TRANSCRIBING" | "CLEANING" | "BINDING" | "SETTINGS";
+
+interface STTProvider {
+  id: string;
+  name: string;
 }
-interface Provider {
+
+interface AIProvider {
   id: string;
   name: string;
   models: { id: string; name: string }[];
 }
 
-const PROVIDERS: Provider[] = [
+const STT_PROVIDERS: STTProvider[] = [
+  { id: "openai", name: "OpenAI Whisper" },
+  { id: "groq", name: "Groq Whisper" },
+  { id: "deepgram", name: "Deepgram" },
+];
+
+const AI_PROVIDERS: AIProvider[] = [
   {
-    id: "anthropic",
-    name: "Claude",
+    id: "anthropic", name: "Claude",
     models: [
       { id: "claude-sonnet-4-6", name: "Sonnet 4" },
       { id: "claude-haiku-4-5-20250414", name: "Haiku 4.5" },
@@ -24,76 +31,64 @@ const PROVIDERS: Provider[] = [
     ],
   },
   {
-    id: "openai",
-    name: "OpenAI",
+    id: "openai", name: "OpenAI",
     models: [
       { id: "gpt-4o", name: "GPT-4o" },
       { id: "gpt-4o-mini", name: "GPT-4o Mini" },
       { id: "gpt-4.1", name: "GPT-4.1" },
-      { id: "o3", name: "o3" },
     ],
   },
   {
-    id: "google",
-    name: "Gemini",
+    id: "google", name: "Gemini",
     models: [
       { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro" },
       { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash" },
     ],
   },
   {
-    id: "mistral",
-    name: "Mistral",
+    id: "mistral", name: "Mistral",
     models: [
       { id: "mistral-large-latest", name: "Mistral Large" },
       { id: "mistral-small-latest", name: "Mistral Small" },
     ],
   },
   {
-    id: "grok",
-    name: "Grok",
+    id: "grok", name: "Grok",
     models: [
       { id: "grok-3", name: "Grok 3" },
       { id: "grok-3-mini", name: "Grok 3 Mini" },
-      { id: "grok-2", name: "Grok 2" },
     ],
   },
   {
-    id: "deepseek",
-    name: "DeepSeek",
+    id: "deepseek", name: "DeepSeek",
     models: [
       { id: "deepseek-chat", name: "DeepSeek V3" },
       { id: "deepseek-reasoner", name: "DeepSeek R1" },
     ],
   },
   {
-    id: "mimo",
-    name: "MiMo",
+    id: "mimo", name: "MiMo",
     models: [
       { id: "MiMo-V2-Flash", name: "MiMo V2 Flash" },
       { id: "MiMo-V2-Omni", name: "MiMo V2 Omni" },
     ],
   },
   {
-    id: "llama",
-    name: "Llama",
+    id: "llama", name: "Llama",
     models: [
       { id: "llama-4-maverick", name: "Maverick" },
       { id: "llama-4-scout", name: "Scout" },
-      { id: "llama-3.3-70b", name: "3.3 70B" },
     ],
   },
   {
-    id: "cohere",
-    name: "Cohere",
+    id: "cohere", name: "Cohere",
     models: [
       { id: "command-a", name: "Command A" },
       { id: "command-r-plus", name: "Command R+" },
     ],
   },
   {
-    id: "fireworks",
-    name: "Fireworks",
+    id: "fireworks", name: "Fireworks",
     models: [
       { id: "accounts/fireworks/models/llama-v3p3-70b-instruct", name: "Llama 3.3" },
       { id: "accounts/fireworks/models/deepseek-v3", name: "DeepSeek V3" },
@@ -109,40 +104,35 @@ function keyLabel(key: string) {
 }
 
 export default function Home() {
+  const [state, setState] = useState<State>("IDLE");
   const [pttKey, setPttKey] = useState(" ");
-  const [binding, setBinding] = useState(false);
-  const [recording, setRecording] = useState(false);
-  const [transcribing, setTranscribing] = useState(false);
-  const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [streaming, setStreaming] = useState(false);
-  const [provider, setProvider] = useState(0);
-  const [modelIdx, setModelIdx] = useState(0);
-  const [streamText, setStreamText] = useState("");
+  const [text, setText] = useState("");
+
+  const [sttProvider, setSttProvider] = useState(0);
+  const [sttApiKey, setSttApiKey] = useState("");
+
+  const [aiProvider, setAiProvider] = useState(0);
+  const [aiModel, setAiModel] = useState(0);
+  const [aiApiKey, setAiApiKey] = useState("");
 
   const recorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
-  const endRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const k = localStorage.getItem("vox-ptt-key");
     if (k) setPttKey(k);
-    const p = localStorage.getItem("vox-provider");
-    if (p) {
-      const i = PROVIDERS.findIndex((x) => x.id === p);
-      if (i >= 0) setProvider(i);
-    }
-    const m = localStorage.getItem("vox-model");
-    if (m) {
-      const i = PROVIDERS[provider].models.findIndex((x) => x.id === m);
-      if (i >= 0) setModelIdx(i);
-    }
+    const sp = localStorage.getItem("vox-stt-provider");
+    if (sp) { const i = STT_PROVIDERS.findIndex(p => p.id === sp); if (i >= 0) setSttProvider(i); }
+    const sk = localStorage.getItem("vox-stt-apikey");
+    if (sk) setSttApiKey(sk);
+    const ap = localStorage.getItem("vox-ai-provider");
+    if (ap) { const i = AI_PROVIDERS.findIndex(p => p.id === ap); if (i >= 0) setAiProvider(i); }
+    const am = localStorage.getItem("vox-ai-model");
+    if (am) { const i = AI_PROVIDERS[aiProvider].models.findIndex(m => m.id === am); if (i >= 0) setAiModel(i); }
+    const ak = localStorage.getItem("vox-ai-apikey");
+    if (ak) setAiApiKey(ak);
   }, []);
-
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamText]);
 
   const startRecording = useCallback(async () => {
     try {
@@ -151,191 +141,272 @@ export default function Home() {
       chunks.current = [];
       rec.ondataavailable = (e) => { if (e.data.size > 0) chunks.current.push(e.data); };
       rec.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
+        stream.getTracks().forEach(t => t.stop());
         const blob = new Blob(chunks.current, { type: "audio/webm" });
-        if (!blob.size) { setRecording(false); return; }
-        setRecording(false);
-        setTranscribing(true);
+        if (!blob.size) { setState("IDLE"); return; }
+        setState("TRANSCRIBING");
         try {
           const fd = new FormData();
           fd.append("audio", blob, "rec.webm");
+          fd.append("provider", STT_PROVIDERS[sttProvider].id);
+          if (sttApiKey) fd.append("apiKey", sttApiKey);
           const r = await fetch("/api/transcribe", { method: "POST", body: fd });
           const { transcript } = await r.json();
-          if (transcript) setInput((prev) => prev ? prev + " " + transcript : transcript);
-        } catch (e) { console.error(e); }
-        finally { setTranscribing(false); inputRef.current?.focus(); }
+          if (!transcript) { setState("IDLE"); return; }
+
+          if (aiApiKey || AI_PROVIDERS[aiProvider].id === "anthropic" || AI_PROVIDERS[aiProvider].id === "openai") {
+            setState("CLEANING");
+            try {
+              const cr = await fetch("/api/cleanup", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  text: transcript,
+                  provider: AI_PROVIDERS[aiProvider].id,
+                  model: AI_PROVIDERS[aiProvider].models[aiModel].id,
+                  apiKey: aiApiKey || undefined,
+                }),
+              });
+              if (cr.ok && cr.body) {
+                const reader = cr.body.getReader();
+                const dec = new TextDecoder();
+                let cleaned = "";
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  cleaned += dec.decode(value, { stream: true });
+                }
+                setText(prev => prev ? prev + " " + cleaned : cleaned);
+              } else {
+                setText(prev => prev ? prev + " " + transcript : transcript);
+              }
+            } catch {
+              setText(prev => prev ? prev + " " + transcript : transcript);
+            }
+          } else {
+            setText(prev => prev ? prev + " " + transcript : transcript);
+          }
+        } catch (e) {
+          console.error(e);
+        }
+        setState("IDLE");
+        setTimeout(() => textareaRef.current?.scrollTo({ top: textareaRef.current.scrollHeight }), 50);
       };
       recorder.current = rec;
       rec.start();
-      setRecording(true);
-    } catch { setRecording(false); }
-  }, []);
+      setState("RECORDING");
+    } catch (e) {
+      console.error(e);
+      setState("IDLE");
+    }
+  }, [sttProvider, sttApiKey, aiProvider, aiModel, aiApiKey]);
 
   const stopRecording = useCallback(() => {
     if (recorder.current?.state === "recording") recorder.current.stop();
   }, []);
 
-  async function send() {
-    const text = input.trim();
-    if (!text || streaming) return;
-    setInput("");
-    setMessages((prev) => [...prev, { role: "user", content: text }]);
-    setStreaming(true);
-    setStreamText("");
-    try {
-      const p = PROVIDERS[provider];
-      const m = p.models[modelIdx];
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, provider: p.id, model: m.id, history: messages }),
-      });
-      if (!res.ok || !res.body) {
-        setMessages((prev) => [...prev, { role: "assistant", content: "error" }]);
-        setStreaming(false);
-        return;
-      }
-      const reader = res.body.getReader();
-      const dec = new TextDecoder();
-      let acc = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        acc += dec.decode(value, { stream: true });
-        setStreamText(acc);
-      }
-      setMessages((prev) => [...prev, { role: "assistant", content: acc }]);
-      setStreamText("");
-    } catch {
-      setMessages((prev) => [...prev, { role: "assistant", content: "error" }]);
-    } finally { setStreaming(false); }
-  }
-
   useEffect(() => {
     function onDown(e: KeyboardEvent) {
-      if (binding) {
-        if (e.key === "Escape") { setBinding(false); return; }
+      if (state === "BINDING") {
+        if (e.key === "Escape") { setState("SETTINGS"); return; }
         if (MODIFIER_KEYS.has(e.key)) return;
         setPttKey(e.key);
         localStorage.setItem("vox-ptt-key", e.key);
-        setBinding(false);
+        setState("SETTINGS");
         return;
       }
-      if (e.key === pttKey && !recording && !streaming && !transcribing) {
+      if (e.key === pttKey && state === "IDLE") {
         e.preventDefault();
         startRecording();
       }
     }
     function onUp(e: KeyboardEvent) {
-      if (e.key === pttKey && recording) { e.preventDefault(); stopRecording(); }
+      if (e.key === pttKey && state === "RECORDING") {
+        e.preventDefault();
+        stopRecording();
+      }
     }
     window.addEventListener("keydown", onDown);
     window.addEventListener("keyup", onUp);
     return () => { window.removeEventListener("keydown", onDown); window.removeEventListener("keyup", onUp); };
-  }, [pttKey, binding, recording, streaming, transcribing, startRecording, stopRecording]);
+  }, [pttKey, state, startRecording, stopRecording]);
 
-  const p = PROVIDERS[provider];
+  function saveSttProvider(i: number) {
+    setSttProvider(i);
+    localStorage.setItem("vox-stt-provider", STT_PROVIDERS[i].id);
+  }
+  function saveSttKey(k: string) {
+    setSttApiKey(k);
+    localStorage.setItem("vox-stt-apikey", k);
+  }
+  function saveAiProvider(i: number) {
+    setAiProvider(i);
+    setAiModel(0);
+    localStorage.setItem("vox-ai-provider", AI_PROVIDERS[i].id);
+    localStorage.setItem("vox-ai-model", AI_PROVIDERS[i].models[0].id);
+  }
+  function saveAiModel(i: number) {
+    setAiModel(i);
+    localStorage.setItem("vox-ai-model", AI_PROVIDERS[aiProvider].models[i].id);
+  }
+  function saveAiKey(k: string) {
+    setAiApiKey(k);
+    localStorage.setItem("vox-ai-apikey", k);
+  }
+
+  const isActive = state === "RECORDING" || state === "TRANSCRIBING" || state === "CLEANING";
 
   return (
     <div className="h-full flex flex-col">
-      {/* Top */}
+      {/* Header */}
       <header className="flex items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-medium tracking-[0.2em] text-white/30 uppercase">vox</span>
-          <select
-            value={provider}
-            onChange={(e) => { setProvider(Number(e.target.value)); setModelIdx(0); localStorage.setItem("vox-provider", PROVIDERS[Number(e.target.value)].id); }}
-            className="bg-transparent text-sm text-white/40 outline-none cursor-pointer hover:text-white/60"
-          >
-            {PROVIDERS.map((pr, i) => <option key={pr.id} value={i} className="bg-[#111]">{pr.name}</option>)}
-          </select>
-          <select
-            value={modelIdx}
-            onChange={(e) => { setModelIdx(Number(e.target.value)); localStorage.setItem("vox-model", p.models[Number(e.target.value)].id); }}
-            className="bg-transparent text-xs text-white/25 outline-none cursor-pointer hover:text-white/40"
-          >
-            {p.models.map((m, i) => <option key={m.id} value={i} className="bg-[#111]">{m.name}</option>)}
-          </select>
-        </div>
+        <span className="text-xs font-medium tracking-[0.2em] text-white/30 uppercase">vox</span>
         <button
-          onClick={() => setBinding(true)}
-          className="text-[11px] text-white/15 hover:text-white/40 transition-colors"
+          onClick={() => setState("SETTINGS")}
+          className="text-white/20 hover:text-white/50 transition-colors"
         >
-          {keyLabel(pttKey)}
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+            <path d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+            <path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+          </svg>
         </button>
       </header>
 
-      {/* Messages */}
-      <main className="flex-1 overflow-y-auto px-6 pb-4">
-        {messages.length === 0 && !streaming ? (
-          <div className="h-full flex items-center justify-center">
-            <p className="text-white/10 text-sm">hold {keyLabel(pttKey)} to speak</p>
-          </div>
-        ) : (
-          <div className="max-w-2xl mx-auto space-y-6 py-4">
-            {messages.map((msg, i) => (
-              <div key={i} className={msg.role === "user" ? "text-right" : "text-left"}>
-                <p className={`inline-block text-[15px] leading-relaxed max-w-[85%] ${msg.role === "user" ? "text-white/60" : "text-white/80"}`}>
-                  {msg.content}
-                </p>
-              </div>
-            ))}
-            {streaming && (
-              <div className="text-left">
-                <p className="inline-block text-[15px] leading-relaxed text-white/80">
-                  {streamText || <span className="text-white/20 animate-pulse">...</span>}
-                </p>
-              </div>
-            )}
-            <div ref={endRef} />
-          </div>
-        )}
+      {/* Main text area */}
+      <main className="flex-1 px-6 pb-4 overflow-hidden">
+        <textarea
+          ref={textareaRef}
+          value={text}
+          onChange={e => setText(e.target.value)}
+          placeholder={isActive ? state === "TRANSCRIBING" ? "transcribing..." : "cleaning..." : "your text appears here..."}
+          disabled={isActive}
+          className="w-full h-full bg-transparent text-white/70 text-base leading-relaxed resize-none outline-none placeholder:text-white/15 disabled:opacity-50"
+        />
       </main>
 
-      {/* Input */}
-      <footer className="px-6 pb-6 pt-2">
-        <div className="max-w-2xl mx-auto flex items-center gap-3">
+      {/* Footer */}
+      <footer className="px-6 pb-5 pt-2 flex items-center justify-between">
+        <div className="flex items-center gap-3">
           <button
-            onMouseDown={() => { if (!recording && !streaming && !transcribing) startRecording(); }}
-            onMouseUp={() => { if (recording) stopRecording(); }}
+            onMouseDown={() => { if (state === "IDLE") startRecording(); }}
+            onMouseUp={() => { if (state === "RECORDING") stopRecording(); }}
+            onTouchStart={e => { e.preventDefault(); if (state === "IDLE") startRecording(); }}
+            onTouchEnd={e => { e.preventDefault(); if (state === "RECORDING") stopRecording(); }}
             className={`w-9 h-9 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${
-              recording ? "bg-red-500/70 scale-110" : transcribing ? "bg-white/10" : "bg-white/[0.06] hover:bg-white/10"
+              state === "RECORDING" ? "bg-red-500/70 scale-110" :
+              state === "TRANSCRIBING" || state === "CLEANING" ? "bg-yellow-500/20" :
+              "bg-white/[0.06] hover:bg-white/10"
             }`}
           >
-            {transcribing ? (
-              <span className="text-white/30 text-[10px]">...</span>
+            {state === "TRANSCRIBING" || state === "CLEANING" ? (
+              <span className="text-yellow-400/60 text-[10px]">...</span>
             ) : (
-              <svg className={`w-3.5 h-3.5 ${recording ? "text-white" : "text-white/30"}`} fill="currentColor" viewBox="0 0 24 24">
+              <svg className={`w-3.5 h-3.5 ${state === "RECORDING" ? "text-white" : "text-white/30"}`} fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
                 <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
               </svg>
             )}
           </button>
-          <input
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-            placeholder={recording ? "listening..." : transcribing ? "transcribing..." : `hold ${keyLabel(pttKey)} or type`}
-            disabled={streaming}
-            className="flex-1 bg-transparent text-white/70 text-[15px] outline-none placeholder:text-white/15 disabled:opacity-40 border-b border-white/[0.06] py-2 focus:border-white/15 transition-colors"
-          />
-          <button
-            onClick={send}
-            disabled={!input.trim() || streaming}
-            className="text-white/20 hover:text-white/50 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-              <path d="M5 12h14M12 5l7 7-7 7" />
-            </svg>
-          </button>
+          <span className="text-[11px] text-white/15">
+            {state === "RECORDING" ? "listening..." :
+             state === "TRANSCRIBING" ? "transcribing..." :
+             state === "CLEANING" ? "cleaning..." :
+             `hold ${keyLabel(pttKey)} to speak`}
+          </span>
         </div>
+        <button
+          onClick={() => setText("")}
+          className="text-[11px] text-white/15 hover:text-white/40 transition-colors"
+        >
+          clear
+        </button>
       </footer>
 
       {/* Binding overlay */}
-      {binding && (
-        <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50" onClick={() => setBinding(false)}>
-          <p className="text-white/40 text-lg font-light">press any key</p>
+      {state === "BINDING" && (
+        <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50">
+          <div className="text-center">
+            <p className="text-white/50 text-lg font-light">press any key</p>
+            <p className="text-white/20 text-xs mt-3">escape to cancel</p>
+          </div>
+        </div>
+      )}
+
+      {/* Settings panel */}
+      {state === "SETTINGS" && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setState("IDLE")} />
+          <div className="relative w-full max-w-sm bg-[#111] border-l border-white/[0.06] overflow-y-auto">
+            <div className="p-6 space-y-8">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-medium text-white/50">Settings</h2>
+                <button onClick={() => setState("IDLE")} className="text-white/20 hover:text-white/50">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                    <path d="M6 18 18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* PTT Key */}
+              <section>
+                <h3 className="text-[11px] text-white/30 uppercase tracking-wider mb-3">Push-to-Talk Key</h3>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-white/60 font-mono bg-white/[0.04] px-3 py-1.5 rounded">{keyLabel(pttKey)}</span>
+                  <button
+                    onClick={() => setState("BINDING")}
+                    className="text-xs text-white/30 hover:text-white/60 transition-colors"
+                  >
+                    change
+                  </button>
+                </div>
+              </section>
+
+              {/* STT Provider */}
+              <section>
+                <h3 className="text-[11px] text-white/30 uppercase tracking-wider mb-3">Transcription</h3>
+                <select
+                  value={sttProvider}
+                  onChange={e => saveSttProvider(Number(e.target.value))}
+                  className="w-full bg-white/[0.04] text-sm text-white/60 px-3 py-2 rounded outline-none border border-white/[0.06] focus:border-white/15"
+                >
+                  {STT_PROVIDERS.map((p, i) => <option key={p.id} value={i} className="bg-[#111]">{p.name}</option>)}
+                </select>
+                <input
+                  type="password"
+                  value={sttApiKey}
+                  onChange={e => saveSttKey(e.target.value)}
+                  placeholder="API key (or use server env)"
+                  className="w-full mt-2 bg-white/[0.04] text-sm text-white/60 px-3 py-2 rounded outline-none border border-white/[0.06] focus:border-white/15 placeholder:text-white/15"
+                />
+              </section>
+
+              {/* AI Provider */}
+              <section>
+                <h3 className="text-[11px] text-white/30 uppercase tracking-wider mb-3">AI Cleanup</h3>
+                <select
+                  value={aiProvider}
+                  onChange={e => saveAiProvider(Number(e.target.value))}
+                  className="w-full bg-white/[0.04] text-sm text-white/60 px-3 py-2 rounded outline-none border border-white/[0.06] focus:border-white/15"
+                >
+                  {AI_PROVIDERS.map((p, i) => <option key={p.id} value={i} className="bg-[#111]">{p.name}</option>)}
+                </select>
+                <select
+                  value={aiModel}
+                  onChange={e => saveAiModel(Number(e.target.value))}
+                  className="w-full mt-2 bg-white/[0.04] text-sm text-white/60 px-3 py-2 rounded outline-none border border-white/[0.06] focus:border-white/15"
+                >
+                  {AI_PROVIDERS[aiProvider].models.map((m, i) => <option key={m.id} value={i} className="bg-[#111]">{m.name}</option>)}
+                </select>
+                <input
+                  type="password"
+                  value={aiApiKey}
+                  onChange={e => saveAiKey(e.target.value)}
+                  placeholder="API key (or use server env)"
+                  className="w-full mt-2 bg-white/[0.04] text-sm text-white/60 px-3 py-2 rounded outline-none border border-white/[0.06] focus:border-white/15 placeholder:text-white/15"
+                />
+              </section>
+            </div>
+          </div>
         </div>
       )}
     </div>
