@@ -1,19 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import Link from "next/link";
 
-type State = "IDLE" | "RECORDING" | "TRANSCRIBING" | "CLEANING" | "BINDING" | "SETTINGS";
+type State = "IDLE" | "RECORDING" | "TRANSCRIBING" | "CLEANING";
 
-interface STTProvider {
-  id: string;
-  name: string;
-}
-
-interface AIProvider {
-  id: string;
-  name: string;
-  models: { id: string; name: string }[];
-}
+interface STTProvider { id: string; name: string; }
+interface AIProvider { id: string; name: string; models: { id: string; name: string }[]; }
 
 const STT_PROVIDERS: STTProvider[] = [
   { id: "openai", name: "OpenAI Whisper" },
@@ -22,78 +15,16 @@ const STT_PROVIDERS: STTProvider[] = [
 ];
 
 const AI_PROVIDERS: AIProvider[] = [
-  {
-    id: "anthropic", name: "Claude",
-    models: [
-      { id: "claude-sonnet-4-6", name: "Sonnet 4" },
-      { id: "claude-haiku-4-5-20250414", name: "Haiku 4.5" },
-      { id: "claude-opus-4-20250514", name: "Opus 4" },
-    ],
-  },
-  {
-    id: "openai", name: "OpenAI",
-    models: [
-      { id: "gpt-4o", name: "GPT-4o" },
-      { id: "gpt-4o-mini", name: "GPT-4o Mini" },
-      { id: "gpt-4.1", name: "GPT-4.1" },
-    ],
-  },
-  {
-    id: "google", name: "Gemini",
-    models: [
-      { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro" },
-      { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash" },
-    ],
-  },
-  {
-    id: "mistral", name: "Mistral",
-    models: [
-      { id: "mistral-large-latest", name: "Mistral Large" },
-      { id: "mistral-small-latest", name: "Mistral Small" },
-    ],
-  },
-  {
-    id: "grok", name: "Grok",
-    models: [
-      { id: "grok-3", name: "Grok 3" },
-      { id: "grok-3-mini", name: "Grok 3 Mini" },
-    ],
-  },
-  {
-    id: "deepseek", name: "DeepSeek",
-    models: [
-      { id: "deepseek-chat", name: "DeepSeek V3" },
-      { id: "deepseek-reasoner", name: "DeepSeek R1" },
-    ],
-  },
-  {
-    id: "mimo", name: "MiMo",
-    models: [
-      { id: "MiMo-V2-Flash", name: "MiMo V2 Flash" },
-      { id: "MiMo-V2-Omni", name: "MiMo V2 Omni" },
-    ],
-  },
-  {
-    id: "llama", name: "Llama",
-    models: [
-      { id: "llama-4-maverick", name: "Maverick" },
-      { id: "llama-4-scout", name: "Scout" },
-    ],
-  },
-  {
-    id: "cohere", name: "Cohere",
-    models: [
-      { id: "command-a", name: "Command A" },
-      { id: "command-r-plus", name: "Command R+" },
-    ],
-  },
-  {
-    id: "fireworks", name: "Fireworks",
-    models: [
-      { id: "accounts/fireworks/models/llama-v3p3-70b-instruct", name: "Llama 3.3" },
-      { id: "accounts/fireworks/models/deepseek-v3", name: "DeepSeek V3" },
-    ],
-  },
+  { id: "anthropic", name: "Claude", models: [{ id: "claude-sonnet-4-6", name: "Sonnet 4" }, { id: "claude-haiku-4-5-20250414", name: "Haiku 4.5" }, { id: "claude-opus-4-20250514", name: "Opus 4" }] },
+  { id: "openai", name: "OpenAI", models: [{ id: "gpt-4o", name: "GPT-4o" }, { id: "gpt-4o-mini", name: "GPT-4o Mini" }, { id: "gpt-4.1", name: "GPT-4.1" }] },
+  { id: "google", name: "Gemini", models: [{ id: "gemini-2.5-pro", name: "Gemini 2.5 Pro" }, { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash" }] },
+  { id: "mistral", name: "Mistral", models: [{ id: "mistral-large-latest", name: "Mistral Large" }, { id: "mistral-small-latest", name: "Mistral Small" }] },
+  { id: "grok", name: "Grok", models: [{ id: "grok-3", name: "Grok 3" }, { id: "grok-3-mini", name: "Grok 3 Mini" }] },
+  { id: "deepseek", name: "DeepSeek", models: [{ id: "deepseek-chat", name: "DeepSeek V3" }, { id: "deepseek-reasoner", name: "DeepSeek R1" }] },
+  { id: "mimo", name: "MiMo", models: [{ id: "MiMo-V2-Flash", name: "MiMo V2 Flash" }, { id: "MiMo-V2-Omni", name: "MiMo V2 Omni" }] },
+  { id: "llama", name: "Llama", models: [{ id: "llama-4-maverick", name: "Maverick" }, { id: "llama-4-scout", name: "Scout" }] },
+  { id: "cohere", name: "Cohere", models: [{ id: "command-a", name: "Command A" }, { id: "command-r-plus", name: "Command R+" }] },
+  { id: "fireworks", name: "Fireworks", models: [{ id: "accounts/fireworks/models/llama-v3p3-70b-instruct", name: "Llama 3.3" }, { id: "accounts/fireworks/models/deepseek-v3", name: "DeepSeek V3" }] },
 ];
 
 const MODIFIER_KEYS = new Set(["Shift", "Control", "Alt", "Meta", "CapsLock", "NumLock", "ScrollLock"]);
@@ -110,7 +41,6 @@ export default function Home() {
 
   const [sttProvider, setSttProvider] = useState(0);
   const [sttApiKey, setSttApiKey] = useState("");
-
   const [aiProvider, setAiProvider] = useState(0);
   const [aiModel, setAiModel] = useState(0);
   const [aiApiKey, setAiApiKey] = useState("");
@@ -129,7 +59,11 @@ export default function Home() {
     const ap = localStorage.getItem("vox-ai-provider");
     if (ap) { const i = AI_PROVIDERS.findIndex(p => p.id === ap); if (i >= 0) setAiProvider(i); }
     const am = localStorage.getItem("vox-ai-model");
-    if (am) { const i = AI_PROVIDERS[aiProvider].models.findIndex(m => m.id === am); if (i >= 0) setAiModel(i); }
+    if (am) {
+      const pIdx = AI_PROVIDERS.findIndex(p => p.id === (localStorage.getItem("vox-ai-provider") || "anthropic"));
+      const mIdx = AI_PROVIDERS[pIdx >= 0 ? pIdx : 0].models.findIndex(m => m.id === am);
+      if (mIdx >= 0) setAiModel(mIdx);
+    }
     const ak = localStorage.getItem("vox-ai-apikey");
     if (ak) setAiApiKey(ak);
   }, []);
@@ -154,7 +88,10 @@ export default function Home() {
           const { transcript } = await r.json();
           if (!transcript) { setState("IDLE"); return; }
 
-          if (aiApiKey || AI_PROVIDERS[aiProvider].id === "anthropic" || AI_PROVIDERS[aiProvider].id === "openai") {
+          const sttId = STT_PROVIDERS[sttProvider].id;
+          const hasSttKey = sttApiKey || sttId === "openai";
+
+          if (hasSttKey) {
             setState("CLEANING");
             try {
               const cr = await fetch("/api/cleanup", {
@@ -207,14 +144,6 @@ export default function Home() {
 
   useEffect(() => {
     function onDown(e: KeyboardEvent) {
-      if (state === "BINDING") {
-        if (e.key === "Escape") { setState("SETTINGS"); return; }
-        if (MODIFIER_KEYS.has(e.key)) return;
-        setPttKey(e.key);
-        localStorage.setItem("vox-ptt-key", e.key);
-        setState("SETTINGS");
-        return;
-      }
       if (e.key === pttKey && state === "IDLE") {
         e.preventDefault();
         startRecording();
@@ -231,48 +160,20 @@ export default function Home() {
     return () => { window.removeEventListener("keydown", onDown); window.removeEventListener("keyup", onUp); };
   }, [pttKey, state, startRecording, stopRecording]);
 
-  function saveSttProvider(i: number) {
-    setSttProvider(i);
-    localStorage.setItem("vox-stt-provider", STT_PROVIDERS[i].id);
-  }
-  function saveSttKey(k: string) {
-    setSttApiKey(k);
-    localStorage.setItem("vox-stt-apikey", k);
-  }
-  function saveAiProvider(i: number) {
-    setAiProvider(i);
-    setAiModel(0);
-    localStorage.setItem("vox-ai-provider", AI_PROVIDERS[i].id);
-    localStorage.setItem("vox-ai-model", AI_PROVIDERS[i].models[0].id);
-  }
-  function saveAiModel(i: number) {
-    setAiModel(i);
-    localStorage.setItem("vox-ai-model", AI_PROVIDERS[aiProvider].models[i].id);
-  }
-  function saveAiKey(k: string) {
-    setAiApiKey(k);
-    localStorage.setItem("vox-ai-apikey", k);
-  }
-
   const isActive = state === "RECORDING" || state === "TRANSCRIBING" || state === "CLEANING";
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header */}
       <header className="flex items-center justify-between px-6 py-4">
         <span className="text-xs font-medium tracking-[0.2em] text-white/30 uppercase">vox</span>
-        <button
-          onClick={() => setState("SETTINGS")}
-          className="text-white/20 hover:text-white/50 transition-colors"
-        >
+        <Link href="/settings" className="text-white/20 hover:text-white/50 transition-colors">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
             <path d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
             <path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
           </svg>
-        </button>
+        </Link>
       </header>
 
-      {/* Main text area */}
       <main className="flex-1 px-6 pb-4 overflow-hidden">
         <textarea
           ref={textareaRef}
@@ -284,7 +185,6 @@ export default function Home() {
         />
       </main>
 
-      {/* Footer */}
       <footer className="px-6 pb-5 pt-2 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
@@ -321,94 +221,6 @@ export default function Home() {
           clear
         </button>
       </footer>
-
-      {/* Binding overlay */}
-      {state === "BINDING" && (
-        <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50">
-          <div className="text-center">
-            <p className="text-white/50 text-lg font-light">press any key</p>
-            <p className="text-white/20 text-xs mt-3">escape to cancel</p>
-          </div>
-        </div>
-      )}
-
-      {/* Settings panel */}
-      {state === "SETTINGS" && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setState("IDLE")} />
-          <div className="relative w-full max-w-sm bg-[#111] border-l border-white/[0.06] overflow-y-auto">
-            <div className="p-6 space-y-8">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-medium text-white/50">Settings</h2>
-                <button onClick={() => setState("IDLE")} className="text-white/20 hover:text-white/50">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                    <path d="M6 18 18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* PTT Key */}
-              <section>
-                <h3 className="text-[11px] text-white/30 uppercase tracking-wider mb-3">Push-to-Talk Key</h3>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-white/60 font-mono bg-white/[0.04] px-3 py-1.5 rounded">{keyLabel(pttKey)}</span>
-                  <button
-                    onClick={() => setState("BINDING")}
-                    className="text-xs text-white/30 hover:text-white/60 transition-colors"
-                  >
-                    change
-                  </button>
-                </div>
-              </section>
-
-              {/* STT Provider */}
-              <section>
-                <h3 className="text-[11px] text-white/30 uppercase tracking-wider mb-3">Transcription</h3>
-                <select
-                  value={sttProvider}
-                  onChange={e => saveSttProvider(Number(e.target.value))}
-                  className="w-full bg-white/[0.04] text-sm text-white/60 px-3 py-2 rounded outline-none border border-white/[0.06] focus:border-white/15"
-                >
-                  {STT_PROVIDERS.map((p, i) => <option key={p.id} value={i} className="bg-[#111]">{p.name}</option>)}
-                </select>
-                <input
-                  type="password"
-                  value={sttApiKey}
-                  onChange={e => saveSttKey(e.target.value)}
-                  placeholder="API key (or use server env)"
-                  className="w-full mt-2 bg-white/[0.04] text-sm text-white/60 px-3 py-2 rounded outline-none border border-white/[0.06] focus:border-white/15 placeholder:text-white/15"
-                />
-              </section>
-
-              {/* AI Provider */}
-              <section>
-                <h3 className="text-[11px] text-white/30 uppercase tracking-wider mb-3">AI Cleanup</h3>
-                <select
-                  value={aiProvider}
-                  onChange={e => saveAiProvider(Number(e.target.value))}
-                  className="w-full bg-white/[0.04] text-sm text-white/60 px-3 py-2 rounded outline-none border border-white/[0.06] focus:border-white/15"
-                >
-                  {AI_PROVIDERS.map((p, i) => <option key={p.id} value={i} className="bg-[#111]">{p.name}</option>)}
-                </select>
-                <select
-                  value={aiModel}
-                  onChange={e => saveAiModel(Number(e.target.value))}
-                  className="w-full mt-2 bg-white/[0.04] text-sm text-white/60 px-3 py-2 rounded outline-none border border-white/[0.06] focus:border-white/15"
-                >
-                  {AI_PROVIDERS[aiProvider].models.map((m, i) => <option key={m.id} value={i} className="bg-[#111]">{m.name}</option>)}
-                </select>
-                <input
-                  type="password"
-                  value={aiApiKey}
-                  onChange={e => saveAiKey(e.target.value)}
-                  placeholder="API key (or use server env)"
-                  className="w-full mt-2 bg-white/[0.04] text-sm text-white/60 px-3 py-2 rounded outline-none border border-white/[0.06] focus:border-white/15 placeholder:text-white/15"
-                />
-              </section>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
