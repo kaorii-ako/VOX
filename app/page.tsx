@@ -3,17 +3,14 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
 type Role = "user" | "assistant";
-
 interface Message {
   role: Role;
   content: string;
 }
-
 interface Provider {
   id: string;
   name: string;
   models: { id: string; name: string }[];
-  envKey: string;
 }
 
 const PROVIDERS: Provider[] = [
@@ -25,7 +22,6 @@ const PROVIDERS: Provider[] = [
       { id: "claude-haiku-4-5-20250414", name: "Haiku 4.5" },
       { id: "claude-opus-4-20250514", name: "Opus 4" },
     ],
-    envKey: "ANTHROPIC_API_KEY",
   },
   {
     id: "openai",
@@ -36,7 +32,6 @@ const PROVIDERS: Provider[] = [
       { id: "gpt-4.1", name: "GPT-4.1" },
       { id: "o3", name: "o3" },
     ],
-    envKey: "OPENAI_API_KEY",
   },
   {
     id: "google",
@@ -45,7 +40,6 @@ const PROVIDERS: Provider[] = [
       { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro" },
       { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash" },
     ],
-    envKey: "GOOGLE_GENERATIVE_AI_API_KEY",
   },
   {
     id: "mistral",
@@ -54,7 +48,6 @@ const PROVIDERS: Provider[] = [
       { id: "mistral-large-latest", name: "Mistral Large" },
       { id: "mistral-small-latest", name: "Mistral Small" },
     ],
-    envKey: "MISTRAL_API_KEY",
   },
   {
     id: "grok",
@@ -64,7 +57,6 @@ const PROVIDERS: Provider[] = [
       { id: "grok-3-mini", name: "Grok 3 Mini" },
       { id: "grok-2", name: "Grok 2" },
     ],
-    envKey: "XAI_API_KEY",
   },
   {
     id: "deepseek",
@@ -73,7 +65,6 @@ const PROVIDERS: Provider[] = [
       { id: "deepseek-chat", name: "DeepSeek V3" },
       { id: "deepseek-reasoner", name: "DeepSeek R1" },
     ],
-    envKey: "DEEPSEEK_API_KEY",
   },
   {
     id: "mimo",
@@ -82,17 +73,15 @@ const PROVIDERS: Provider[] = [
       { id: "MiMo-V2-Flash", name: "MiMo V2 Flash" },
       { id: "MiMo-V2-Omni", name: "MiMo V2 Omni" },
     ],
-    envKey: "MIMO_API_KEY",
   },
   {
     id: "llama",
     name: "Llama",
     models: [
-      { id: "llama-4-maverick", name: "Llama 4 Maverick" },
-      { id: "llama-4-scout", name: "Llama 4 Scout" },
-      { id: "llama-3.3-70b", name: "Llama 3.3 70B" },
+      { id: "llama-4-maverick", name: "Maverick" },
+      { id: "llama-4-scout", name: "Scout" },
+      { id: "llama-3.3-70b", name: "3.3 70B" },
     ],
-    envKey: "TOGETHER_API_KEY",
   },
   {
     id: "cohere",
@@ -101,33 +90,22 @@ const PROVIDERS: Provider[] = [
       { id: "command-a", name: "Command A" },
       { id: "command-r-plus", name: "Command R+" },
     ],
-    envKey: "COHERE_API_KEY",
   },
   {
     id: "fireworks",
     name: "Fireworks",
     models: [
-      { id: "accounts/fireworks/models/llama-v3p3-70b-instruct", name: "Llama 3.3 70B" },
+      { id: "accounts/fireworks/models/llama-v3p3-70b-instruct", name: "Llama 3.3" },
       { id: "accounts/fireworks/models/deepseek-v3", name: "DeepSeek V3" },
     ],
-    envKey: "FIREWORKS_API_KEY",
   },
 ];
 
-const MODIFIER_KEYS = new Set([
-  "Shift",
-  "Control",
-  "Alt",
-  "Meta",
-  "CapsLock",
-  "NumLock",
-  "ScrollLock",
-]);
+const MODIFIER_KEYS = new Set(["Shift", "Control", "Alt", "Meta", "CapsLock", "NumLock", "ScrollLock"]);
 
-function keyDisplayName(key: string): string {
-  if (key === " ") return "SPACE";
-  if (key.length === 1) return key.toUpperCase();
-  return key;
+function keyLabel(key: string) {
+  if (key === " ") return "space";
+  return key.length === 1 ? key.toUpperCase() : key;
 }
 
 export default function Home() {
@@ -135,150 +113,108 @@ export default function Home() {
   const [binding, setBinding] = useState(false);
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
-  const [inputText, setInputText] = useState("");
+  const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [streaming, setStreaming] = useState(false);
-  const [showKeyBtn, setShowKeyBtn] = useState(false);
   const [provider, setProvider] = useState(0);
   const [modelIdx, setModelIdx] = useState(0);
   const [streamText, setStreamText] = useState("");
 
-  const mediaRecorder = useRef<MediaRecorder | null>(null);
+  const recorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
-  const messagesEnd = useRef<HTMLDivElement>(null);
+  const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const savedKey = localStorage.getItem("vox-ptt-key");
-    if (savedKey !== null) setPttKey(savedKey);
-    const savedProvider = localStorage.getItem("vox-provider");
-    if (savedProvider !== null) {
-      const idx = PROVIDERS.findIndex((p) => p.id === savedProvider);
-      if (idx >= 0) setProvider(idx);
+    const k = localStorage.getItem("vox-ptt-key");
+    if (k) setPttKey(k);
+    const p = localStorage.getItem("vox-provider");
+    if (p) {
+      const i = PROVIDERS.findIndex((x) => x.id === p);
+      if (i >= 0) setProvider(i);
     }
-    const savedModel = localStorage.getItem("vox-model");
-    if (savedModel !== null) {
-      const idx = PROVIDERS[provider].models.findIndex((m) => m.id === savedModel);
-      if (idx >= 0) setModelIdx(idx);
+    const m = localStorage.getItem("vox-model");
+    if (m) {
+      const i = PROVIDERS[provider].models.findIndex((x) => x.id === m);
+      if (i >= 0) setModelIdx(i);
     }
   }, []);
 
   useEffect(() => {
-    messagesEnd.current?.scrollIntoView({ behavior: "smooth" });
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamText]);
 
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      const rec = new MediaRecorder(stream, { mimeType: "audio/webm" });
       chunks.current = [];
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunks.current.push(e.data);
-      };
-
-      recorder.onstop = async () => {
+      rec.ondataavailable = (e) => { if (e.data.size > 0) chunks.current.push(e.data); };
+      rec.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
         const blob = new Blob(chunks.current, { type: "audio/webm" });
-        if (blob.size === 0) {
-          setRecording(false);
-          return;
-        }
+        if (!blob.size) { setRecording(false); return; }
         setRecording(false);
         setTranscribing(true);
         try {
-          const form = new FormData();
-          form.append("audio", blob, "recording.webm");
-          const res = await fetch("/api/transcribe", { method: "POST", body: form });
-          const { transcript } = await res.json();
-          if (transcript) {
-            setInputText((prev) => (prev ? prev + " " + transcript : transcript));
-          }
-        } catch (e) {
-          console.error("Transcription failed:", e);
-        } finally {
-          setTranscribing(false);
-          inputRef.current?.focus();
-        }
+          const fd = new FormData();
+          fd.append("audio", blob, "rec.webm");
+          const r = await fetch("/api/transcribe", { method: "POST", body: fd });
+          const { transcript } = await r.json();
+          if (transcript) setInput((prev) => prev ? prev + " " + transcript : transcript);
+        } catch (e) { console.error(e); }
+        finally { setTranscribing(false); inputRef.current?.focus(); }
       };
-
-      mediaRecorder.current = recorder;
-      recorder.start();
+      recorder.current = rec;
+      rec.start();
       setRecording(true);
-    } catch (e) {
-      console.error("Mic access denied:", e);
-      setRecording(false);
-    }
+    } catch { setRecording(false); }
   }, []);
 
   const stopRecording = useCallback(() => {
-    if (mediaRecorder.current?.state === "recording") {
-      mediaRecorder.current.stop();
-    }
+    if (recorder.current?.state === "recording") recorder.current.stop();
   }, []);
 
-  async function sendMessage() {
-    const text = inputText.trim();
+  async function send() {
+    const text = input.trim();
     if (!text || streaming) return;
-
-    setInputText("");
+    setInput("");
     setMessages((prev) => [...prev, { role: "user", content: text }]);
     setStreaming(true);
     setStreamText("");
-
     try {
       const p = PROVIDERS[provider];
       const m = p.models[modelIdx];
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: text,
-          provider: p.id,
-          model: m.id,
-          history: messages,
-        }),
+        body: JSON.stringify({ message: text, provider: p.id, model: m.id, history: messages }),
       });
-
       if (!res.ok || !res.body) {
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: "Error: failed to get response." },
-        ]);
+        setMessages((prev) => [...prev, { role: "assistant", content: "error" }]);
         setStreaming(false);
         return;
       }
-
       const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let accumulated = "";
-
+      const dec = new TextDecoder();
+      let acc = "";
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        accumulated += decoder.decode(value, { stream: true });
-        setStreamText(accumulated);
+        acc += dec.decode(value, { stream: true });
+        setStreamText(acc);
       }
-
-      setMessages((prev) => [...prev, { role: "assistant", content: accumulated }]);
+      setMessages((prev) => [...prev, { role: "assistant", content: acc }]);
       setStreamText("");
     } catch {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "Error: connection failed." },
-      ]);
-    } finally {
-      setStreaming(false);
-    }
+      setMessages((prev) => [...prev, { role: "assistant", content: "error" }]);
+    } finally { setStreaming(false); }
   }
 
   useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
+    function onDown(e: KeyboardEvent) {
       if (binding) {
-        if (e.key === "Escape") {
-          setBinding(false);
-          return;
-        }
+        if (e.key === "Escape") { setBinding(false); return; }
         if (MODIFIER_KEYS.has(e.key)) return;
         setPttKey(e.key);
         localStorage.setItem("vox-ptt-key", e.key);
@@ -290,224 +226,116 @@ export default function Home() {
         startRecording();
       }
     }
-
-    function onKeyUp(e: KeyboardEvent) {
-      if (e.key === pttKey && recording) {
-        e.preventDefault();
-        stopRecording();
-      }
+    function onUp(e: KeyboardEvent) {
+      if (e.key === pttKey && recording) { e.preventDefault(); stopRecording(); }
     }
-
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("keyup", onKeyUp);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("keyup", onKeyUp);
-    };
+    window.addEventListener("keydown", onDown);
+    window.addEventListener("keyup", onUp);
+    return () => { window.removeEventListener("keydown", onDown); window.removeEventListener("keyup", onUp); };
   }, [pttKey, binding, recording, streaming, transcribing, startRecording, stopRecording]);
 
-  function onTouchStart(e: React.TouchEvent) {
-    if (!recording && !streaming && !transcribing) {
-      e.preventDefault();
-      startRecording();
-    }
-  }
-
-  function onTouchEnd(e: React.TouchEvent) {
-    if (recording) {
-      e.preventDefault();
-      stopRecording();
-    }
-  }
-
-  function switchProvider(idx: number) {
-    setProvider(idx);
-    setModelIdx(0);
-    localStorage.setItem("vox-provider", PROVIDERS[idx].id);
-    localStorage.setItem("vox-model", PROVIDERS[idx].models[0].id);
-  }
-
-  function switchModel(idx: number) {
-    setModelIdx(idx);
-    localStorage.setItem("vox-model", PROVIDERS[provider].models[idx].id);
-  }
-
-  const currentProvider = PROVIDERS[provider];
+  const p = PROVIDERS[provider];
 
   return (
-    <div
-      className="h-full flex flex-col select-none"
-      onTouchStart={onTouchStart}
-      onTouchEnd={onTouchEnd}
-      onMouseEnter={() => setShowKeyBtn(true)}
-      onMouseLeave={() => setShowKeyBtn(false)}
-    >
-      {/* Top bar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-white/10">
-        <div className="flex items-center gap-2">
-          <h1 className="text-sm font-semibold text-white/60 tracking-widest uppercase">
-            VOX
-          </h1>
-          <span className="text-xs text-white/20">|</span>
+    <div className="h-full flex flex-col">
+      {/* Top */}
+      <header className="flex items-center justify-between px-6 py-4">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-medium tracking-[0.2em] text-white/30 uppercase">vox</span>
           <select
             value={provider}
-            onChange={(e) => switchProvider(Number(e.target.value))}
-            className="bg-transparent text-sm text-white/70 outline-none cursor-pointer hover:text-white transition-colors"
+            onChange={(e) => { setProvider(Number(e.target.value)); setModelIdx(0); localStorage.setItem("vox-provider", PROVIDERS[Number(e.target.value)].id); }}
+            className="bg-transparent text-sm text-white/40 outline-none cursor-pointer hover:text-white/60"
           >
-            {PROVIDERS.map((p, i) => (
-              <option key={p.id} value={i} className="bg-[#1a1a1a]">
-                {p.name}
-              </option>
-            ))}
+            {PROVIDERS.map((pr, i) => <option key={pr.id} value={i} className="bg-[#111]">{pr.name}</option>)}
           </select>
           <select
             value={modelIdx}
-            onChange={(e) => switchModel(Number(e.target.value))}
-            className="bg-transparent text-sm text-white/40 outline-none cursor-pointer hover:text-white/70 transition-colors"
+            onChange={(e) => { setModelIdx(Number(e.target.value)); localStorage.setItem("vox-model", p.models[Number(e.target.value)].id); }}
+            className="bg-transparent text-xs text-white/25 outline-none cursor-pointer hover:text-white/40"
           >
-            {currentProvider.models.map((m, i) => (
-              <option key={m.id} value={i} className="bg-[#1a1a1a]">
-                {m.name}
-              </option>
-            ))}
+            {p.models.map((m, i) => <option key={m.id} value={i} className="bg-[#111]">{m.name}</option>)}
           </select>
         </div>
         <button
           onClick={() => setBinding(true)}
-          className={`text-xs text-white/20 hover:text-white/50 transition-opacity ${
-            showKeyBtn ? "opacity-100" : "opacity-0"
-          }`}
+          className="text-[11px] text-white/15 hover:text-white/40 transition-colors"
         >
-          key: {keyDisplayName(pttKey)} ✎
+          {keyLabel(pttKey)}
         </button>
-      </div>
+      </header>
 
-      {/* Messages area */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
-        {messages.length === 0 && !streaming && (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-white/15 text-lg">
-              hold {keyDisplayName(pttKey)} to speak
-            </p>
+      {/* Messages */}
+      <main className="flex-1 overflow-y-auto px-6 pb-4">
+        {messages.length === 0 && !streaming ? (
+          <div className="h-full flex items-center justify-center">
+            <p className="text-white/10 text-sm">hold {keyLabel(pttKey)} to speak</p>
+          </div>
+        ) : (
+          <div className="max-w-2xl mx-auto space-y-6 py-4">
+            {messages.map((msg, i) => (
+              <div key={i} className={msg.role === "user" ? "text-right" : "text-left"}>
+                <p className={`inline-block text-[15px] leading-relaxed max-w-[85%] ${msg.role === "user" ? "text-white/60" : "text-white/80"}`}>
+                  {msg.content}
+                </p>
+              </div>
+            ))}
+            {streaming && (
+              <div className="text-left">
+                <p className="inline-block text-[15px] leading-relaxed text-white/80">
+                  {streamText || <span className="text-white/20 animate-pulse">...</span>}
+                </p>
+              </div>
+            )}
+            <div ref={endRef} />
           </div>
         )}
+      </main>
 
-        {messages.map((msg, i) => (
-          <div
-            key={i}
-            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-          >
-            <div
-              className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                msg.role === "user"
-                  ? "bg-white/10 text-white/90"
-                  : "text-white/70"
-              }`}
-            >
-              {msg.content}
-            </div>
-          </div>
-        ))}
-
-        {streaming && streamText && (
-          <div className="flex justify-start">
-            <div className="max-w-[80%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed text-white/70">
-              {streamText}
-            </div>
-          </div>
-        )}
-
-        {streaming && !streamText && (
-          <div className="flex justify-start">
-            <div className="px-4 py-2.5 text-white/30 animate-pulse">...</div>
-          </div>
-        )}
-
-        <div ref={messagesEnd} />
-      </div>
-
-      {/* Input area */}
-      <div className="px-4 py-3 border-t border-white/10">
-        <div className="flex items-center gap-3">
-          {/* Mic button */}
+      {/* Input */}
+      <footer className="px-6 pb-6 pt-2">
+        <div className="max-w-2xl mx-auto flex items-center gap-3">
           <button
-            onMouseDown={() => {
-              if (!recording && !streaming && !transcribing) startRecording();
-            }}
-            onMouseUp={() => {
-              if (recording) stopRecording();
-            }}
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${
-              recording
-                ? "bg-red-500/80 scale-110"
-                : transcribing
-                ? "bg-yellow-500/30"
-                : "bg-white/10 hover:bg-white/20"
+            onMouseDown={() => { if (!recording && !streaming && !transcribing) startRecording(); }}
+            onMouseUp={() => { if (recording) stopRecording(); }}
+            className={`w-9 h-9 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${
+              recording ? "bg-red-500/70 scale-110" : transcribing ? "bg-white/10" : "bg-white/[0.06] hover:bg-white/10"
             }`}
           >
             {transcribing ? (
-              <span className="text-yellow-400 text-xs">...</span>
+              <span className="text-white/30 text-[10px]">...</span>
             ) : (
-              <svg
-                className={`w-4 h-4 ${recording ? "text-white" : "text-white/50"}`}
-                fill="currentColor"
-                viewBox="0 0 24 24"
-              >
+              <svg className={`w-3.5 h-3.5 ${recording ? "text-white" : "text-white/30"}`} fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
                 <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
               </svg>
             )}
           </button>
-
-          {/* Text input */}
           <input
             ref={inputRef}
-            type="text"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-              }
-            }}
-            placeholder={
-              recording
-                ? "listening..."
-                : transcribing
-                ? "transcribing..."
-                : `hold ${keyDisplayName(pttKey)} or type here...`
-            }
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+            placeholder={recording ? "listening..." : transcribing ? "transcribing..." : `hold ${keyLabel(pttKey)} or type`}
             disabled={streaming}
-            className="flex-1 bg-white/5 text-white/90 text-sm px-4 py-2.5 rounded-xl outline-none placeholder:text-white/20 disabled:opacity-50 focus:ring-1 focus:ring-white/20"
+            className="flex-1 bg-transparent text-white/70 text-[15px] outline-none placeholder:text-white/15 disabled:opacity-40 border-b border-white/[0.06] py-2 focus:border-white/15 transition-colors"
           />
-
-          {/* Send button */}
           <button
-            onClick={sendMessage}
-            disabled={!inputText.trim() || streaming}
-            className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center flex-shrink-0 transition-colors"
+            onClick={send}
+            disabled={!input.trim() || streaming}
+            className="text-white/20 hover:text-white/50 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
           >
-            <svg
-              className="w-4 h-4 text-white/50"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              viewBox="0 0 24 24"
-            >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
               <path d="M5 12h14M12 5l7 7-7 7" />
             </svg>
           </button>
         </div>
-      </div>
+      </footer>
 
       {/* Binding overlay */}
       {binding && (
-        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50">
-          <div className="text-center">
-            <p className="text-3xl text-white/60 font-light">press any key...</p>
-            <p className="text-sm text-white/20 mt-4">escape to cancel</p>
-          </div>
+        <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50" onClick={() => setBinding(false)}>
+          <p className="text-white/40 text-lg font-light">press any key</p>
         </div>
       )}
     </div>

@@ -1,12 +1,11 @@
 {
-  "name": "vox-temp",
+  "name": "vox",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "start": "next start"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.1",
