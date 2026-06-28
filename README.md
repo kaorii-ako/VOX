@@ -1,50 +1,47 @@
 # VOX
 
-[![HackaTime](https://hackatime-badge.hackclub.com/kaorii-ako/VOX)](https://hackatime.hackclub.com)
+Push-to-talk AI in the browser.
 
-A web dashboard and CLI tool for viewing your [HackaTime](https://hackatime.hackclub.com) coding stats.
+Hold a key → speak → get a response from Claude. No mouse required.
 
 ## Setup
 
-Your API key is already configured in `app.js` and `cli.js`. To change it, edit the `API_KEY` constant.
-
-## Web Dashboard
-
-Open `index.html` in your browser:
-
 ```bash
-# Using Python
-python3 -m http.server 8000
-
-# Then open http://localhost:8000
+npm install
 ```
 
-Features:
-- Total coding time and daily average
-- Language breakdown (doughnut chart)
-- Editor breakdown
-- Project breakdown
-- OS breakdown
-- Switch between 7-day, 30-day, 6-month, and 1-year ranges
+Add your API keys to `.env.local`:
 
-## CLI
-
-```bash
-node cli.js                  # Last 7 days (default)
-node cli.js last_30_days     # Last 30 days
-node cli.js last_6_months    # Last 6 months
-node cli.js last_year        # Last year
+```
+ANTHROPIC_API_KEY=your-key-here
+OPENAI_API_KEY=your-key-here
 ```
 
-## API Reference
+## Run
 
-Base URL: `https://hackatime.hackclub.com/api/hackatime/v1`
+```bash
+npm run dev
+```
 
-| Endpoint | Description |
-|----------|-------------|
-| `/users/current/stats/{range}` | Get coding stats for a time range |
-| `/users/{id}/statusbar/today` | Get today's status bar data |
+Open [http://localhost:3000](http://localhost:3000).
 
-Ranges: `last_7_days`, `last_30_days`, `last_6_months`, `last_year`
+## How it works
 
-Auth: `Authorization: Bearer <api_key>`
+| State | UI | Action |
+|-------|-----|--------|
+| IDLE | "hold SPACE" | Hold the configured key |
+| RECORDING | Pulsing red dot | Release the key |
+| THINKING | "..." | Audio is transcribed, sent to Claude |
+| RESPONDING | Streaming text | Fades to IDLE after 8s |
+
+- Default key: SPACE
+- Click "change key" (bottom-right, visible on hover) to rebind
+- Mobile: tap and hold anywhere on screen
+- Key choice persists in localStorage
+
+## Stack
+
+- Next.js 15 (App Router)
+- Tailwind CSS
+- Vercel AI SDK + Claude Sonnet
+- OpenAI Whisper API
